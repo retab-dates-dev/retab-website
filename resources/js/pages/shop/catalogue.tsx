@@ -26,17 +26,19 @@ interface Filters {
 // category list, auth and every other shared prop untouched (no re-query, smaller
 // payload, no remount), which is what makes it feel like an SPA instead of a
 // page load. `categories` is deferred server-side, so it isn't in this list.
-const FILTER_ONLY = ['products', 'filters', 'activeCategory'];
+const FILTER_ONLY = ['products', 'filters', 'activeCategory', 'activeEvent'];
 
 export default function ShopCatalogue({
     categories,
     products,
     activeCategory,
+    activeEvent = null,
     filters,
 }: {
     categories: Category[];
     products: Paginator<StoreProduct>;
     activeCategory: string | null;
+    activeEvent?: { id: number; name_ar: string; name_en: string | null } | null;
     filters: Filters;
 }) {
     const { t } = useTranslation();
@@ -52,6 +54,7 @@ export default function ShopCatalogue({
             q: filters.q || undefined,
             sort: filters.sort !== 'newest' ? filters.sort : undefined,
             on_sale: filters.on_sale ? '1' : undefined,
+            event: activeEvent ? String(activeEvent.id) : undefined,
             ...patch,
         };
         return Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== undefined && v !== '')) as Record<string, string>;
@@ -67,7 +70,7 @@ export default function ShopCatalogue({
     const go = (patch: Record<string, string | undefined>) =>
         router.get('/shop', params(patch), { preserveState: true, preserveScroll: true, only: FILTER_ONLY });
 
-    const hasFilters = Boolean(filters.q || filters.on_sale || activeCategory || filters.sort !== 'newest');
+    const hasFilters = Boolean(filters.q || filters.on_sale || activeCategory || activeEvent || filters.sort !== 'newest');
 
     const chip = (active: boolean) =>
         `rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -86,7 +89,9 @@ export default function ShopCatalogue({
                 <meta name="twitter:card" content="summary_large_image" />
             </Head>
 
-            <h1 className="font-heading text-brand-teal mb-6 text-center text-[clamp(1.75rem,4vw,2.75rem)] font-black">{t('catalogue.heading')}</h1>
+            <h1 className="font-heading text-brand-teal mb-6 text-center text-[clamp(1.75rem,4vw,2.75rem)] font-black">
+                {activeEvent ? localized(activeEvent, 'name') : t('catalogue.heading')}
+            </h1>
 
             {/* Category chips — real <a> links (crawlable) that visit as partial
                 reloads, prefetched on hover so the click feels instant. */}

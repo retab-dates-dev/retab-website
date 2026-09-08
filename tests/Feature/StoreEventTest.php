@@ -233,6 +233,104 @@ class StoreEventTest extends TestCase
         );
     }
 
+    // --------------------------------------------------------------------- nav
+
+    /**
+     * 🔴 The reported bug. `navCategories` had no has-products filter, so the
+     * العروض الخاصة bucket seeded by the store-events migration rendered a navbar
+     * item leading straight to "No products in this category". The catalogue's own
+     * filter chips have always excluded empty categories; the navbar never did.
+     */
+    public function test_the_navbar_hides_a_category_with_no_visible_products(): void
+    {
+        // Seeded by the migration, deliberately empty until a bundle is created.
+        $this->assertNotNull(Category::where('slug', 'special-offers')->first());
+        $this->makeProduct();
+
+        $this->get('/')->assertOk()->assertInertia(function (Assert $page) {
+            $page->has('navCategories');
+            $slugs = collect($page->toArray()['props']['navCategories'])->pluck('slug');
+            $this->assertNotContains('special-offers', $slugs, 'an empty category must not reach the navbar');
+            $this->assertContains('dates', $slugs, 'a category with products still must');
+        });
+    }
+
+    /** Give it a product and it earns its place, without any code change. */
+    public function test_the_navbar_shows_that_category_once_it_holds_a_product(): void
+    {
+        $bundle = Category::where('slug', 'special-offers')->first();
+        $this->makeProduct(['category_id' => $bundle->id, 'name_ar' => 'عرض مجمّع']);
+
+        $this->get('/')->assertOk()->assertInertia(function (Assert $page) {
+            $slugs = collect($page->toArray()['props']['navCategories'])->pluck('slug');
+            $this->assertContains('special-offers', $slugs);
+        });
+    }
+
+    public function test_the_navbar_lists_a_running_event_under_its_own_name(): void
+    {
+        $event = $this->makeEvent();
+        $event->products()->attach($this->makeProduct()->id);
+
+        $this->get('/')->assertOk()->assertInertia(
+            fn (Assert $page) => $page->has('navEvents', 1)
+                ->where('navEvents.0.id', $event->id)
+                // The NAME, not a fixed "Special Offers" label — that is the whole ask.
+                ->where('navEvents.0.name_ar', 'اليوم الوطني السعودي')
+                ->where('navEvents.0.name_en', 'Saudi National Day'),
+        );
+    }
+
+    public function test_the_navbar_lists_no_event_when_none_is_running(): void
+    {
+        $this->makeEvent(['starts_at' => now()->addWeek(), 'ends_at' => now()->addWeeks(2)])
+            ->products()->attach($this->makeProduct()->id);
+
+        $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page->has('navEvents', 0));
+    }
+
+    /** Same discipline as `hasOffers`: never link to a destination with nothing on it. */
+    public function test_the_navbar_hides_an_event_whose_offers_are_all_hidden(): void
+    {
+        $this->makeEvent()->products()->attach($this->makeProduct(['is_active' => false])->id);
+
+        $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page->has('navEvents', 0));
+    }
+
+    // ---------------------------------------------------- browsing one campaign
+
+    public function test_the_event_filter_shows_only_that_events_offers(): void
+    {
+        $event = $this->makeEvent();
+        $inEvent = $this->makeProduct(['name_ar' => 'داخل الحملة']);
+        $this->makeProduct(['name_ar' => 'خارج الحملة']);
+        $event->products()->attach($inEvent->id);
+
+        $this->get("/shop?event={$event->id}")->assertOk()->assertInertia(
+            fn (Assert $page) => $page->has('products.data', 1)
+                ->where('products.data.0.id', $inEvent->id)
+                // The heading is the campaign's name, so the shopper knows what
+                // they are looking at rather than an unlabelled filtered list.
+                ->where('activeEvent.name_ar', 'اليوم الوطني السعودي'),
+        );
+    }
+
+    /**
+     * A stale link (a shared WhatsApp message, a bookmark) must degrade to the
+     * plain catalogue rather than resurrect a finished campaign's line-up.
+     */
+    public function test_a_link_to_a_finished_event_falls_back_to_the_whole_catalogue(): void
+    {
+        $event = $this->makeEvent(['starts_at' => now()->subWeeks(2), 'ends_at' => now()->subDay()]);
+        $event->products()->attach($this->makeProduct()->id);
+        $this->makeProduct(['name_ar' => 'منتج آخر']);
+
+        $this->get("/shop?event={$event->id}")->assertOk()->assertInertia(
+            fn (Assert $page) => $page->where('activeEvent', null)
+                ->has('products.data', 2),
+        );
+    }
+
     // ------------------------------------------------------------------- admin
 
     private function admin(): User

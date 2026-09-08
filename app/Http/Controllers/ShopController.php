@@ -90,6 +90,15 @@ class ShopController
             ? $request->query('sort')
             : 'newest';
         $onSaleOnly = $request->boolean('on_sale');
+        // 🔑 Resolved BEFORE the query, and the filter is driven by the resolved
+        // event rather than the raw id. Filtering on the id while labelling from a
+        // separate lookup lets the two disagree: a link to a finished campaign then
+        // dropped its heading (correct) but KEPT its filter, so the shopper landed
+        // on "0 products" instead of the catalogue. Caught by a test that asserted
+        // the fallback this comment claims.
+        $activeEvent = $request->integer('event')
+            ? StoreEvent::running()->whereKey($request->integer('event'))->first(['id', 'name_ar', 'name_en'])
+            : null;
 
         // Resolve only the filtered category's id — cheap, and it runs on the
         // partial (filter) reloads too, unlike the full chip list below.
@@ -128,6 +137,17 @@ class ShopController
             $query->onSale()->notInRunningEvent();
         }
 
+        // Browse one campaign's offers as a set. Where the navbar's event item and
+        // the homepage strip both lead, so a shopper who saw two of six offers can
+        // see the rest.
+        //
+        // ⚠️ `$activeEvent` is null unless the event is RUNNING, so a link to a
+        // finished campaign falls through to the ordinary catalogue rather than
+        // quietly resurrecting last year's line-up under this year's heading.
+        if ($activeEvent) {
+            $query->whereHas('storeEvents', fn ($q) => $q->whereKey($activeEvent->id));
+        }
+
         match ($sort) {
             'price_asc' => $query->orderBy('price'),
             'price_desc' => $query->orderByDesc('price'),
@@ -152,10 +172,12 @@ class ShopController
                 ->get(['id', 'name_ar', 'name_en', 'slug']),
             'products' => $products,
             'activeCategory' => $activeCategory,
+            'activeEvent' => $activeEvent,
             'filters' => [
                 'q' => $search,
                 'sort' => $sort,
                 'on_sale' => $onSaleOnly,
+                'event' => $activeEvent?->id,
             ],
         ]);
     }

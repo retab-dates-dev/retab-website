@@ -15,8 +15,15 @@ interface NavCategory {
     children: { id: number; name_ar: string; name_en: string | null; slug: string }[];
 }
 
+interface NavEvent {
+    id: number;
+    name_ar: string;
+    name_en: string | null;
+}
+
 interface SharedProps {
     navCategories?: NavCategory[];
+    navEvents?: NavEvent[];
     cart?: { count?: number };
     auth?: { user?: unknown };
     hasOffers?: boolean;
@@ -177,6 +184,9 @@ export default function StoreNavbar() {
 
     const navCategories = props.navCategories ?? [];
     const hasOffers = Boolean(props.hasOffers);
+    // Running campaigns, each its own nav item under its OWN name. The row simply
+    // has nothing to map over when none is running, so it hides itself — no flag.
+    const navEvents: NavEvent[] = Array.isArray(props.navEvents) ? props.navEvents : [];
     const cartCount = props.cart?.count ?? 0;
     const loggedIn = Boolean(props.auth?.user);
     /*
@@ -627,6 +637,19 @@ export default function StoreNavbar() {
                         ),
                     )}
 
+                    {/* A running campaign, named by the event itself, ahead of the
+                        ordinary Offers link — it is the thing the store is currently
+                        pushing. Nothing renders between events. */}
+                    {navEvents.map((event) => (
+                        <Link
+                            key={event.id}
+                            href={`/shop?event=${event.id}`}
+                            className={`${linkBase} ${url.includes(`event=${event.id}`) ? linkActive : linkIdle}`}
+                        >
+                            {localized(event, 'name')}
+                        </Link>
+                    ))}
+
                     {hasOffers && (
                         <Link href="/shop?on_sale=1" className={`${linkBase} ${url.includes('on_sale=1') ? linkActive : linkIdle}`}>
                             {t('nav.offers')}
@@ -721,6 +744,17 @@ export default function StoreNavbar() {
                                         </Link>
                                     )}
                                 </div>
+                            ))}
+
+                            {navEvents.map((event) => (
+                                <Link
+                                    key={event.id}
+                                    href={`/shop?event=${event.id}`}
+                                    className="text-brand-gold hover:bg-brand-cream rounded-lg px-3 py-2"
+                                    onClick={() => setMobileOpen(false)}
+                                >
+                                    {localized(event, 'name')}
+                                </Link>
                             ))}
 
                             {hasOffers && (

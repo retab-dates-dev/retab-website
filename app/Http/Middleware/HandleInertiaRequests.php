@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Models\StoreEvent;
 use App\Models\User;
 use App\Services\CartService;
 use App\Services\WhatsApp\WhatsAppGateway;
@@ -81,10 +82,26 @@ class HandleInertiaRequests extends Middleware
             'ogImage' => url('/og-image.jpg'),
             // Storefront nav tree (parents + active children) for the navbar.
             // Closure → only resolved for Inertia responses, not every request.
+            //
+            // ⚠️ Only categories that actually hold something are listed, at BOTH
+            // levels. Without this a category with no visible products renders a nav
+            // item leading straight to "No products in this category" — which is
+            // exactly what the seeded العروض الخاصة bucket did the moment store
+            // events shipped. The catalogue's own filter chips have always had this
+            // rule (`whereHas('products', visibleOnStore)`); the navbar never did.
+            //
+            // A top-level entry qualifies on its own products OR a child's, because
+            // the two nav parents (التمور / الهدايا) deliberately hold no products
+            // themselves and exist only to open a dropdown.
             'navCategories' => fn () => Category::query()
                 ->whereNull('parent_id')
                 ->where('is_active', true)
-                ->with(['children' => fn ($q) => $q->where('is_active', true)->orderBy('sort_order')])
+                ->where(fn ($q) => $q
+                    ->whereHas('products', fn ($p) => $p->visibleOnStore())
+                    ->orWhereHas('children.products', fn ($p) => $p->visibleOnStore()))
+                ->with(['children' => fn ($q) => $q->where('is_active', true)
+                    ->whereHas('products', fn ($p) => $p->visibleOnStore())
+                    ->orderBy('sort_order')])
                 ->orderBy('sort_order')
                 ->get()
                 ->map(fn (Category $c) => [
@@ -99,6 +116,21 @@ class HandleInertiaRequests extends Middleware
                         'slug' => $child->slug,
                     ])->values(),
                 ])->values(),
+            // Running store events, for the navbar. Each renders as its OWN nav item
+            // under the event's name — «اليوم الوطني السعودي», not a fixed "Special
+            // Offers" label — and the row disappears by itself when nothing is
+            // running, because there is then nothing to map over.
+            //
+            // ⚠️ Gated on the event actually HAVING a live offer, matching what the
+            // homepage strip and `/shop?event=` will show. The same discipline as
+            // `hasOffers` below: a nav item whose destination is empty is worse than
+            // no nav item.
+            'navEvents' => fn () => StoreEvent::running()
+                ->whereHas('products', fn ($q) => $q->where('is_active', true))
+                ->orderBy('sort_order')
+                ->orderBy('starts_at')
+                ->get(['id', 'name_ar', 'name_en'])
+                ->values(),
             'cart' => [
                 'count' => app(CartService::class)->count(),
             ],

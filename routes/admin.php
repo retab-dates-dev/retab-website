@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\ReturnController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\ShippingController;
 use App\Http\Controllers\Admin\StockImportController;
+use App\Http\Controllers\Admin\StoreEventController;
 use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -126,6 +127,31 @@ Route::middleware(['auth', 'staff', 'admin.locale'])->prefix('admin')->name('adm
         Route::post('discounts/import/apply', [DiscountController::class, 'applyImport'])->name('discounts.import.apply');
         Route::post('discounts/clear', [DiscountController::class, 'clear'])->name('discounts.clear');
         Route::post('discounts/undo/{activityLog}', [DiscountController::class, 'undo'])->name('discounts.undo');
+    });
+
+    // Store events — named, time-boxed homepage campaigns ("اليوم الوطني السعودي").
+    // Distinct from discounts: this decides what the campaign is CALLED and which
+    // products it fronts; the price itself is still the product's own sale window.
+    Route::get('store-events', [StoreEventController::class, 'index'])->middleware('permission:store_events.view')->name('store-events.index');
+    Route::get('store-events/{store_event}', [StoreEventController::class, 'show'])->middleware('permission:store_events.view')->name('store-events.show');
+    Route::middleware('permission:store_events.manage')->group(function () {
+        Route::post('store-events', [StoreEventController::class, 'store'])->name('store-events.store');
+        Route::put('store-events/{store_event}', [StoreEventController::class, 'update'])->name('store-events.update');
+        Route::patch('store-events/{store_event}/toggle', [StoreEventController::class, 'toggle'])->name('store-events.toggle');
+        Route::delete('store-events/{store_event}', [StoreEventController::class, 'destroy'])->name('store-events.destroy');
+
+        // ⚠️ `offers/reorder` is declared BEFORE the `offers/{product}` wildcard.
+        // It cannot actually collide here (reorder is POST, update is PATCH), but
+        // the literal-before-wildcard order is the habit that stops the next
+        // endpoint added under this prefix from being swallowed by it.
+        Route::post('store-events/{store_event}/offers/reorder', [StoreEventController::class, 'reorderOffers'])->name('store-events.offers.reorder');
+        Route::post('store-events/{store_event}/offers', [StoreEventController::class, 'attachOffer'])->name('store-events.offers.attach');
+        Route::patch('store-events/{store_event}/offers/{product}', [StoreEventController::class, 'updateOffer'])->name('store-events.offers.update');
+        Route::delete('store-events/{store_event}/offers/{product}', [StoreEventController::class, 'detachOffer'])->name('store-events.offers.detach');
+        // Multipart, so POST — a PUT/PATCH body is not parsed by PHP and the file
+        // would arrive empty (same reason product images have their own endpoint).
+        Route::post('store-events/{store_event}/offers/{product}/banner', [StoreEventController::class, 'uploadOfferBanner'])->name('store-events.offers.banner');
+        Route::delete('store-events/{store_event}/offers/{product}/banner', [StoreEventController::class, 'deleteOfferBanner'])->name('store-events.offers.banner.delete');
     });
 
     // Customer directory (read-only).

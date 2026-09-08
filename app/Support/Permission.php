@@ -25,6 +25,7 @@ class Permission
         'marketing' => ['view', 'send'],
         'coupons' => ['view', 'create', 'edit', 'delete'],
         'discounts' => ['view', 'manage'],
+        'store_events' => ['view', 'manage'],
         'reviews' => ['view', 'manage'],
         'product_reviews' => ['view', 'manage'],
         'content_pages' => ['view', 'edit'],
@@ -53,6 +54,7 @@ class Permission
         'marketing' => ['view' => true, 'send' => false],
         'coupons' => ['view' => true, 'create' => true, 'edit' => true, 'delete' => false],
         'discounts' => ['view' => true, 'manage' => false],
+        'store_events' => ['view' => true, 'manage' => false],
         'reviews' => ['view' => true, 'manage' => true],
         'product_reviews' => ['view' => true, 'manage' => true],
         'content_pages' => ['view' => true, 'edit' => true],
@@ -85,11 +87,11 @@ class Permission
         // The daily fulfilment desk: take orders out of the door, handle returns.
         'operations' => ['orders', 'returns', 'shipping', 'product_requests', 'customers', 'inventory', 'contact_messages'],
         // Looks after what the store sells and how it reads.
-        'catalogue' => ['products', 'coupons', 'discounts', 'reviews', 'product_reviews', 'content_pages'],
+        'catalogue' => ['products', 'coupons', 'discounts', 'store_events', 'reviews', 'product_reviews', 'content_pages'],
         // Everything except the settings that can reconfigure the business itself.
         'manager' => [
             'orders', 'returns', 'shipping', 'product_requests', 'customers', 'inventory', 'contact_messages',
-            'products', 'coupons', 'discounts', 'reviews', 'product_reviews', 'content_pages', 'marketing', 'change_log',
+            'products', 'coupons', 'discounts', 'store_events', 'reviews', 'product_reviews', 'content_pages', 'marketing', 'change_log',
         ],
     ];
 

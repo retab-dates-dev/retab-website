@@ -37,6 +37,12 @@ interface Props {
     form?: string;
     onClick?: () => void;
     disabled?: boolean;
+    /**
+     * Accessible name. Required for an ICON-ONLY button: without it a screen
+     * reader announces nothing at all, and `getByRole('button', { name })` cannot
+     * find it either. Visible text is preferred where there is room for it.
+     */
+    'aria-label'?: string;
 }
 
 /** The one button used across the admin panel. Keeps every action consistent. */
@@ -52,6 +58,7 @@ export default function Button({
     form,
     onClick,
     disabled,
+    'aria-label': ariaLabel,
 }: Props) {
     const cls = `${BASE} ${VARIANTS[variant]} ${SIZES[size]} ${className}`;
     const inner = (
@@ -63,14 +70,14 @@ export default function Button({
 
     if (href) {
         return (
-            <Link href={href} method={method} className={cls}>
+            <Link href={href} method={method} className={cls} aria-label={ariaLabel}>
                 {inner}
             </Link>
         );
     }
 
     return (
-        <button type={type} form={form} onClick={onClick} disabled={disabled} className={cls}>
+        <button type={type} form={form} onClick={onClick} disabled={disabled} className={cls} aria-label={ariaLabel}>
             {inner}
         </button>
     );

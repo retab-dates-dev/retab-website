@@ -118,6 +118,21 @@ const DOMAINS = {
             expired: { tone: 'idle', icon: CalendarX },
         },
     },
+    /**
+     * A named campaign's lifecycle. Nothing here is `attention`: an event that has
+     * not started or is over needs no decision from anyone, and that tone is
+     * reserved for the queues in the dashboard's action list.
+     */
+    storeEvent: {
+        prefix: 'admin.storeEvents.status.',
+        values: {
+            active: { tone: 'active', icon: Zap },
+            scheduled: { tone: 'idle', icon: CalendarClock },
+            ended: { tone: 'idle', icon: CalendarX },
+            // The one state a human chose, so it reads as stopped rather than over.
+            paused: { tone: 'stopped', icon: CirclePause },
+        },
+    },
     changeLog: {
         prefix: 'admin.changeLog.actions.',
         values: {

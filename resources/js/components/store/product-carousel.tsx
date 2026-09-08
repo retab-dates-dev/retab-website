@@ -1,6 +1,7 @@
+import { useCarousel } from '@/hooks/use-carousel';
 import { useLocalized } from '@/lib/localize';
 import { Link } from '@inertiajs/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export interface CarouselProduct {
@@ -60,71 +61,29 @@ export default function ProductCarousel({
     /** Flip the corner watermark to the right edge (mirrored) instead of the left. */
     mirrorPattern?: boolean;
 }) {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const localized = useLocalized();
     const currency = t('common.currency');
-    const trackRef = useRef<HTMLDivElement>(null);
-    // Kept as PHYSICAL directions ("is there anything further left?"), because the
-    // buttons are physical. Deriving them from a start/end pair silently inverts
-    // them under RTL — see measure().
-    const [edges, setEdges] = useState({ canLeft: false, canRight: true });
-    // Whether the track actually overflows at the current breakpoint — drives
-    // both the arrows (hidden when everything fits) and centring (few cards are
-    // centred instead of hugging the start). Default heuristic: more cards than
-    // the widest view shows (4); measure() corrects it to the real overflow on
-    // mount / resize, so tablet (3) and mobile (2) are handled too.
-    const [scrollable, setScrollable] = useState(() => products.length > 4);
     const [imageHeight, setImageHeight] = useState(0);
 
-    const measure = useCallback(() => {
-        const el = trackRef.current;
-        if (!el) return;
-        const max = el.scrollWidth - el.clientWidth;
-        // scrollLeft runs 0..max in LTR but -max..0 in RTL (modern browsers keep
-        // 0 at the reading start and go negative toward the end), so the travel
-        // limits have to be read per direction. Collapsing them with Math.abs()
-        // makes "at the start" mean the LEFT edge in LTR and the RIGHT edge in
-        // RTL, which inverted both buttons on the Arabic site: the arrow that
-        // actually paged was the disabled one, and the enabled one clamped and
-        // did nothing.
-        const rtl = getComputedStyle(el).direction === 'rtl';
-        const pos = el.scrollLeft;
-        setEdges({
-            canLeft: pos > (rtl ? -max : 0) + 1,
-            canRight: pos < (rtl ? 0 : max) - 1,
-        });
-        setScrollable(max > 1);
-
-        // Height of the first card's square image (its first child), so arrows
-        // sit at its centre — not the centre of the taller card incl. name/price.
+    // Height of the first card's square image (its first child), so arrows sit at
+    // its centre — not the centre of the taller card incl. name/price.
+    const onMeasure = useCallback((el: HTMLDivElement) => {
         const media = el.firstElementChild?.firstElementChild as HTMLElement | undefined;
         if (media) setImageHeight(media.offsetHeight);
     }, []);
 
-    useEffect(() => {
-        measure();
-        const el = trackRef.current;
-        if (!el) return;
-        el.addEventListener('scroll', measure, { passive: true });
-        window.addEventListener('resize', measure);
-        return () => {
-            el.removeEventListener('scroll', measure);
-            window.removeEventListener('resize', measure);
-        };
-        // `i18n.language`: the locale toggle flips document.dir without a reload or a
-        // resize, so nothing else would re-run measure() and the arrows would keep
-        // the previous direction's enabled states until the next scroll.
-    }, [measure, products.length, i18n.language]);
-
-    const page = (dir: 'left' | 'right') => {
-        const el = trackRef.current;
-        if (!el) return;
-        // One viewport of cards. Because cards exactly fill the track, clientWidth
-        // + one gap equals a whole number of card steps, so the scroll snaps onto
-        // a fresh full set regardless of how many are visible at this breakpoint.
-        const step = el.clientWidth + GAP;
-        el.scrollBy({ left: dir === 'left' ? -step : step, behavior: 'smooth' });
-    };
+    // Paging, the arrow enabled states and the RTL handling all live in the shared
+    // hook (see it for why the scroll limits are read per direction). The initial
+    // guess is "more cards than the widest view shows (4)", which is what the SSR
+    // sidecar renders; measure() corrects it to the real overflow on mount and on
+    // resize, so tablet (3) and mobile (2) are handled too.
+    const { trackRef, edges, scrollable, page } = useCarousel({
+        gap: GAP,
+        deps: [products.length],
+        onMeasure,
+        initialScrollable: products.length > 4,
+    });
 
     if (products.length === 0) return null;
 

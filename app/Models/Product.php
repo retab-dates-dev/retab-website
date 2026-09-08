@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
@@ -286,6 +287,17 @@ class Product extends Model
     }
 
     /**
+     * The named store campaigns this product has been attached to (past, running
+     * and scheduled). Filter with `->running()` for the live one.
+     */
+    public function storeEvents(): BelongsToMany
+    {
+        return $this->belongsToMany(StoreEvent::class, 'event_product')
+            ->withPivot(['banner_image', 'badge_ar', 'badge_en', 'sort_order'])
+            ->withTimestamps();
+    }
+
+    /**
      * Active options only, cheapest first — what the storefront may offer.
      */
     public function activeOptions(): HasMany
@@ -356,6 +368,32 @@ class Product extends Model
             ->whereColumn('sale_price', '<', 'price')
             ->where(fn (Builder $q) => $q->whereNull('sale_starts_at')->orWhere('sale_starts_at', '<=', $now))
             ->where(fn (Builder $q) => $q->whereNull('sale_ends_at')->orWhere('sale_ends_at', '>=', $now));
+    }
+
+    /**
+     * Products NOT attached to a currently-running store event.
+     *
+     * 🔴 This is the rule that keeps the two offer surfaces from mixing, and it is
+     * the whole reason a named event can sit beside the ordinary discounts strip.
+     * A product in a running event is shown in that event's own section, headed by
+     * the event name; without this scope a discounted event product would ALSO
+     * appear in the العروض strip lower down the same page, i.e. twice.
+     *
+     * ⚠️ It has THREE call sites and they must agree, because two of them are the
+     * link and the page it points at:
+     *   1. ShopController::index      — the العروض homepage strip
+     *   2. ShopController::catalogue  — /shop?on_sale=1, where that strip links to
+     *   3. HandleInertiaRequests      — `hasOffers`, which drives the Offers nav
+     *      item, the mobile drawer entry and the cart's empty-state link
+     * Miss the third and the nav offers a link to a page with nothing on it.
+     *
+     * Deliberately scoped to the on-sale surfaces only: an event product is still
+     * an ordinary product everywhere else, so it keeps its category and still
+     * appears in normal browsing and search.
+     */
+    public function scopeNotInRunningEvent(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('storeEvents', fn (Builder $q) => $q->running());
     }
 
     /**

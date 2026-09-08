@@ -7,6 +7,7 @@ import StoreHero from '@/components/store/hero';
 import NewArrivals from '@/components/store/new-arrivals';
 import Offers from '@/components/store/offers';
 import PrimaryBanner from '@/components/store/primary-banner';
+import StoreEventSection, { type StoreEventPayload } from '@/components/store/store-event';
 import StoreLayout from '@/layouts/store-layout';
 import { type SharedData } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
@@ -57,12 +58,14 @@ interface ReviewItem {
 
 export default function ShopIndex({
     bestSellers = [],
+    storeEvents = [],
     offers = [],
     newArrivals = [],
     featuredCategories = [],
     reviews = [],
 }: {
     bestSellers?: ProductCard[];
+    storeEvents?: StoreEventPayload[];
     offers?: ProductCard[];
     newArrivals?: ProductCard[];
     featuredCategories?: FeaturedCategory[];
@@ -88,6 +91,14 @@ export default function ShopIndex({
             </Head>
 
             <StoreHero />
+            {/* Named campaigns sit ABOVE Best Sellers and are absent entirely
+                between events, so the page returns to its ordinary shape. Two
+                overlapping events render two titled sections in order, which needs
+                no "which one wins" rule. Distinct from <Offers/> lower down: that
+                strip is ordinary discounts, and a product cannot be in both. */}
+            {storeEvents.map((event) => (
+                <StoreEventSection key={event.id} event={event} />
+            ))}
             <BestSellers products={bestSellers} />
             <Offers products={offers} />
             <CategoriesSection categories={featuredCategories} />

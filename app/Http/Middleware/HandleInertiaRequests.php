@@ -105,7 +105,12 @@ class HandleInertiaRequests extends Middleware
             // Whether any active discounted product exists → drives the storefront
             // "Offers" nav visibility (hidden when there are none). Closure: a cheap
             // EXISTS resolved only for full Inertia page loads.
-            'hasOffers' => fn () => Product::where('is_active', true)->onSale()->exists(),
+            //
+            // ⚠️ `notInRunningEvent()` is NOT optional here, and this is the call
+            // site easiest to forget: it must match the catalogue's `on_sale` filter
+            // exactly, or the nav shows an Offers link whose page is empty because
+            // every discounted product happens to be inside a running store event.
+            'hasOffers' => fn () => Product::where('is_active', true)->onSale()->notInRunningEvent()->exists(),
             // Footer/contact block, admin-editable via settings (falls back to
             // FOOTER_DEFAULTS when a key is unset). Closure → resolved only for
             // Inertia page responses; one batched query.

@@ -39,7 +39,14 @@ class ZidCatalogImporterTest extends TestCase
         $this->assertSame(1, $result->drafts);
 
         // 2 nav parents + 6 leaf categories.
-        $this->assertSame(2, Category::whereNull('parent_id')->count());
+        //
+        // ⚠️ "Nav parent" is `top-level AND has children`, not merely `top-level`.
+        // A bare count also picks up standalone categories the importer never
+        // touches — the store-events migration seeds one (العروض الخاصة, the
+        // permanent home for campaign bundles), which broke this outright. Asserting
+        // the shape the importer actually builds keeps it true when the next one
+        // lands.
+        $this->assertSame(2, Category::whereNull('parent_id')->has('children')->count());
         $this->assertSame(6, Category::whereNotNull('parent_id')->count());
         $this->assertNotNull(Category::where('slug', 'dates')->first()->parent_id);
     }

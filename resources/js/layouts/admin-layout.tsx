@@ -12,6 +12,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import {
     BadgePercent,
     Boxes,
+    CalendarHeart,
     FileText,
     History,
     Info,
@@ -83,6 +84,7 @@ const NAV_GROUPS: { key: string; items: NavItem[] }[] = [
             { key: 'marketing', href: '/admin/marketing', icon: Megaphone, perm: 'marketing' },
             { key: 'coupons', href: '/admin/coupons', icon: TicketPercent, perm: 'coupons' },
             { key: 'discounts', href: '/admin/discounts', icon: BadgePercent, perm: 'discounts' },
+            { key: 'storeEvents', href: '/admin/store-events', icon: CalendarHeart, perm: 'store_events' },
         ],
     },
     {

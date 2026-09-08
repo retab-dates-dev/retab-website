@@ -181,11 +181,24 @@ const ar = {
         title: 'الأكثر مبيعاً',
     },
     offers: {
-        title: 'عروض خاصة',
+        // ⚠️ Was "عروض خاصة" (Special Offers) until store events shipped. Renamed to
+        // match this strip's OWN nav item ("العروض"), because the new Special Offers
+        // CATEGORY — the permanent home for event bundles — now owns that name, and
+        // a strip titled "عروض خاصة" showing ordinary discounts beside a category
+        // called "العروض الخاصة" holding different products is a page arguing with
+        // itself. One word to revert if the client prefers the old title.
+        title: 'العروض',
     },
     newArrivals: {
         title: 'وصل حديثاً',
         badge: 'صنف جديد',
+    },
+    storeEvent: {
+        // ⚠️ `{{n}}`, never `{{count}}` — i18next reserves `count` for pluralization,
+        // which in Arabic means six suffixed variants these keys do not define.
+        endsIn: 'ينتهي خلال {{n}} يوم',
+        endsToday: 'ينتهي اليوم',
+        percentOff: 'خصم {{n}}٪',
     },
     carousel: {
         prev: 'السابق',
@@ -642,6 +655,7 @@ const ar = {
             marketing: 'التسويق',
             coupons: 'الكوبونات',
             discounts: 'الخصومات',
+            storeEvents: 'مناسبات المتجر',
             reviews: 'آراء العملاء',
             contentPages: 'الصفحات',
             contactMessages: 'الرسائل',
@@ -932,6 +946,7 @@ const ar = {
             toggleSidebar: 'إظهار/إخفاء القائمة',
             closeMenu: 'إغلاق القائمة',
             dismiss: 'إخفاء',
+            save: 'حفظ',
             clear: 'مسح',
         },
         contextMenu: {
@@ -1011,6 +1026,20 @@ const ar = {
             rulesTitle: 'معلومات مهمة',
             turnOffPulse: 'إيقاف هذا التنبيه من الإعدادات',
             pages: {
+                storeEvents: {
+                    intro: 'حملة باسمها لها قسم خاص في الصفحة الرئيسية أعلى الأكثر مبيعاً.',
+                    steps: [
+                        'أنشئ المناسبة، وضع الاسم الذي سيقرأه العميل كعنوان، وحدد تواريخ عملها.',
+                        'أضف المنتجات المشاركة: منتج مجمّع أعددته للحملة، أو منتج قائم تضع عليه خصماً.',
+                        'اضبط الخصم على المنتج نفسه، مع جعل تواريخ الخصم مطابقة لتواريخ المناسبة.',
+                    ],
+                    rules: [
+                        'يظهر القسم ويختفي تلقائياً حسب التواريخ، ولا يحتاج إيقافاً بعد انتهائه.',
+                        'المنتج المشارك في مناسبة جارية يُستبعد من قسم العروض المعتاد، فلا يظهر مرتين في صفحة واحدة.',
+                        'المناسبة لا تحدد الأسعار. إذا ظهر سعر خاطئ فالخصم موضوع على المنتج.',
+                        'تعرض البطاقة صورة المنتج تلقائياً إذا لم يكن للعرض تصميم خاص.',
+                    ],
+                },
                 dashboard: {
                     intro: 'لمحة سريعة عن متجرك: اتجاه المبيعات، والمهام التي تحتاج إلى إجراء، وحالة المخزون، وما يشتريه العملاء.',
                     rules: [
@@ -1529,6 +1558,80 @@ const ar = {
                 optional: 'اختياري',
                 unlimited: 'غير محدود',
                 save: 'حفظ الكوبون',
+            },
+        },
+        storeEvents: {
+            title: 'مناسبات المتجر',
+            subtitle: 'حملات باسمها ومدة محددة، لكل واحدة قسم خاص بها في الصفحة الرئيسية أعلى الأكثر مبيعاً.',
+            new: 'مناسبة جديدة',
+            create: 'إنشاء المناسبة',
+            open: 'فتح',
+            live: 'تعمل',
+            paused: 'موقوفة',
+            empty: 'لا توجد مناسبات بعد. أنشئ واحدة لعرض حملة باسمها في الصفحة الرئيسية.',
+            saveEvent: 'حفظ المناسبة',
+            backToList: 'كل المناسبات',
+            details: 'تفاصيل المناسبة',
+            offers: 'عروض هذه المناسبة',
+            offerCount: '{{n}} عروض',
+            addOffer: 'إضافة عرض',
+            addOfferHint: 'اختر أي منتج معروض. السعر يأتي من المنتج نفسه، لذا اضبط الخصم وتواريخه على المنتج.',
+            searchProducts: 'ابحث عن منتج بالاسم أو الرمز',
+            noProducts: 'لا توجد منتجات مطابقة.',
+            noOffers: 'لا توجد عروض بعد. أضف منتجاً من الأعلى ليظهر في الصفحة الرئيسية طوال مدة المناسبة.',
+            columns: {
+                name: 'المناسبة',
+                window: 'المدة',
+                offers: 'العروض',
+                status: 'الحالة',
+                actions: 'إجراءات',
+            },
+            status: {
+                active: 'جارية',
+                scheduled: 'مجدولة',
+                ended: 'منتهية',
+                paused: 'موقوفة',
+            },
+            accents: {
+                default: 'رطاب (الافتراضي)',
+                brand: 'أخضر رطاب',
+                national_day: 'أخضر اليوم الوطني',
+                ramadan: 'رمضان',
+                eid: 'العيد',
+                gold: 'ذهبي رطاب',
+            },
+            fields: {
+                nameAr: 'اسم المناسبة (بالعربية)',
+                nameEn: 'اسم المناسبة (بالإنجليزية)',
+                nameHint: 'هذا هو العنوان الظاهر في الصفحة الرئيسية، مثل: اليوم الوطني السعودي.',
+                subtitleAr: 'سطر فرعي (بالعربية)',
+                subtitleEn: 'سطر فرعي (بالإنجليزية)',
+                subtitleHint: 'سطر اختياري يظهر تحت العنوان.',
+                startsAt: 'تبدأ',
+                endsAt: 'تنتهي',
+                endsHint: 'يختفي القسم من الصفحة الرئيسية تلقائياً في هذا الوقت.',
+                accent: 'لون المناسبة',
+                accentHint: 'يلوّن العنوان والشارات والأسعار في هذا القسم فقط. اتركه على رطاب للون الأخضر المعتاد.',
+                isActive: 'مفعّلة',
+                isActiveHint: 'أوقفها لسحب المناسبة دون تغيير تواريخها.',
+            },
+            offer: {
+                artwork: 'تصميم خاص',
+                productPhoto: 'صورة المنتج',
+                hidden: 'منتج مخفي',
+                noDiscount: 'لا يوجد خصم',
+                badgeAr: 'الشارة (بالعربية)',
+                badgeEn: 'الشارة (بالإنجليزية)',
+                badgeArPlaceholder: 'مثال: كرتونين + الثالث مجاناً',
+                badgeEnPlaceholder: 'مثال: Buy 2 cartons, get 1 free',
+                badgeHint: 'اتركها فارغة لتظهر نسبة الخصم وحدها على البطاقة.',
+                save: 'حفظ الشارة',
+                uploadArtwork: 'رفع تصميم',
+                removeArtwork: 'إزالة التصميم',
+                viewOnStore: 'عرض في المتجر',
+                moveUp: 'تحريك لأعلى',
+                moveDown: 'تحريك لأسفل',
+                remove: 'إزالة من المناسبة',
             },
         },
         discounts: {

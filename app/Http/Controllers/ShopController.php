@@ -9,12 +9,14 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Review;
 use App\Models\ReviewHelpfulVote;
+use App\Models\StoreEvent;
 use App\Models\Wishlist;
 use App\Services\ReviewRewardService;
 use App\Services\ReviewService;
 use App\Support\Media;
 use App\Support\ProductCards;
 use App\Support\SearchText;
+use App\Support\StoreEventCards;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -32,10 +34,21 @@ class ShopController
     {
         return Inertia::render('shop/index', [
             'bestSellers' => $this->bestSellers(),
+            // Named, time-boxed campaigns — each renders its own titled strip above
+            // Best Sellers. Two overlapping events therefore render two sections in
+            // order, which needs no "which one wins" rule and handles the ordinary
+            // single-event case for free.
+            'storeEvents' => $this->storeEvents(),
             // Active discounted products for the homepage "offers" strip (empty →
             // the section renders nothing). Featured first, then newest.
+            //
+            // `notInRunningEvent()` is what keeps an event product out of this
+            // strip — it is already shown above under the event's own name, and
+            // showing it twice on one page is exactly what the separate sections
+            // are meant to avoid. See the scope for its other two call sites.
             'offers' => Product::where('is_active', true)
                 ->onSale()
+                ->notInRunningEvent()
                 ->with(['category:id,name_ar,name_en,slug', 'images', 'activeOptions'])
                 ->orderByDesc('is_featured')
                 ->latest()
@@ -108,7 +121,11 @@ class ShopController
         }
 
         if ($onSaleOnly) {
-            $query->onSale();
+            // Same exclusion as the homepage strip that links here — an event
+            // product belongs to its own section, not to "العروض". Applying it in
+            // one place and not the other is what would make the link and its
+            // destination disagree.
+            $query->onSale()->notInRunningEvent();
         }
 
         match ($sort) {
@@ -347,5 +364,29 @@ class ShopController
     private function card(Product $product): array
     {
         return ProductCards::card($product);
+    }
+
+    /**
+     * Running store events, each with its live offers.
+     *
+     * ⚠️ Events whose offers all turned out to be hidden are dropped rather than
+     * rendered empty: a titled section with nothing under it reads as a broken
+     * page, and it is a realistic state — a product can be deactivated (or fail
+     * the publish guard) while it is still attached to a live event.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function storeEvents(): array
+    {
+        return StoreEvent::running()
+            ->with(['products' => fn ($q) => $q->where('is_active', true)
+                ->with(['images', 'activeOptions'])])
+            ->orderBy('sort_order')
+            ->orderBy('starts_at')
+            ->get()
+            ->map(fn (StoreEvent $e) => StoreEventCards::payload($e))
+            ->filter(fn (array $e) => $e['offers'] !== [])
+            ->values()
+            ->all();
     }
 }

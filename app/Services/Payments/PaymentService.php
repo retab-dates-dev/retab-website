@@ -7,6 +7,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentTransactionType;
 use App\Models\Order;
+use App\Models\OrderActivity;
 use App\Models\Payment;
 use App\Services\CustomerMailer;
 use Illuminate\Support\Facades\DB;
@@ -95,7 +96,7 @@ class PaymentService
 
             if ($payment->isPaid() && $amountOk && $currencyOk) {
                 $this->recordTransaction($order, PaymentTransactionType::Capture, 'succeeded', $payment);
-                $this->markOrderPaid($order);
+                $this->markOrderPaid($order, $payment);
 
                 return $order;
             }
@@ -197,11 +198,15 @@ class PaymentService
         ])->save();
     }
 
-    private function markOrderPaid(Order $order): void
+    private function markOrderPaid(Order $order, ?NormalizedPayment $payment = null): void
     {
         if ($order->payment_status === PaymentStatus::Paid) {
             return;
         }
+
+        // Read BEFORE the write, so the audit line records the transition this
+        // payment actually caused rather than the state it left behind.
+        $fromStatus = $order->status?->value;
 
         $order->forceFill([
             'payment_status' => PaymentStatus::Paid,
@@ -212,6 +217,19 @@ class PaymentService
                 : $order->status,
             'paid_at' => now(),
         ])->save();
+
+        // The order's own timeline had no line for money arriving, so an admin
+        // reading it saw the status move with nothing explaining why. Sits inside
+        // the early return above, so a repeated webhook cannot log it twice.
+        OrderActivity::logPaymentReceived(
+            $order,
+            $fromStatus,
+            'moyasar',
+            $payment ? $payment->amount / 100 : $order->total,
+            $payment?->currency ?? $this->configuredCurrency(),
+            $payment?->id,
+            $payment?->sourceCompany,
+        );
 
         // The customer's receipt waits for real money. Sending it at checkout would
         // promise an order to anyone who merely reached the hosted card page and

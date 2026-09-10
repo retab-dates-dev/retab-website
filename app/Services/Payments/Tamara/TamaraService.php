@@ -326,6 +326,16 @@ class TamaraService
         ])->save();
 
         if ($firstAuthorization) {
+            // Gated on the first transition for the same reason the receipt is:
+            // this method re-runs on every repeated webhook delivery.
+            OrderActivity::logPaymentAuthorized(
+                $order,
+                OrderStatus::PendingPayment->value,
+                'tamara',
+                $order->total,
+                $order->currency,
+            );
+
             app(CustomerMailer::class)->orderPlaced($order);
         }
     }

@@ -4,6 +4,7 @@ import StatusBadge from '@/components/admin/status-badge';
 import CopyText from '@/components/copy-text';
 import { useAdminT } from '@/i18n/use-admin-t';
 import { THEAD } from '@/lib/admin-ui';
+import type { TFunction } from 'i18next';
 import {
     Ban,
     Building2,
@@ -44,8 +45,22 @@ export interface OrderActivity {
     from_status: string | null;
     to_status: string | null;
     note: string | null;
-    /** Shipping entries carry the carrier, tracking number and the store's cost. */
-    meta: { tracking_number?: string; carrier?: string; cost?: number; currency?: string } | null;
+    /**
+     * Shipping entries carry the carrier, tracking number and the store's cost;
+     * payment entries carry the gateway, the amount and the gateway's own id.
+     * `cost` is what a CARRIER charged the store, `amount` is what a CUSTOMER
+     * paid — they are deliberately separate keys and must not be conflated.
+     */
+    meta: {
+        tracking_number?: string;
+        carrier?: string;
+        cost?: number;
+        currency?: string;
+        gateway?: string;
+        amount?: number;
+        transaction_id?: string;
+        method?: string;
+    } | null;
     user: string | null;
     created_at: string | null;
 }
@@ -86,6 +101,45 @@ export interface OrderCan {
     /** Recall the SHIPMENT and return the order to confirmed. Moves no money. */
     cancelShipment: boolean;
     sendPaymentLink: boolean;
+}
+
+/**
+ * One line of the order timeline.
+ *
+ * 🔑 A switch rather than a longer ternary chain, because the chain ended in a
+ * bare `a.type` fallback — which is exactly why `payment_lapsed` and
+ * `payment_link_sent` rendered as raw snake_case for months: an unhandled type
+ * failed silently instead of visibly. Anything unknown still degrades to the raw
+ * type, but every type the server actually writes is now covered here.
+ *
+ * ⚠️ Adding a new activity type on the server means adding it here too. There is
+ * no gate that catches the omission.
+ */
+function activityLabel(a: OrderActivity, t: TFunction): ReactNode {
+    const line = (key: string, opts?: Record<string, unknown>) => <b>{t(`admin.orders.show.${key}`, opts)}</b>;
+
+    switch (a.type) {
+        case 'status_change':
+            return (
+                <>
+                    {a.from_status ? t(`status.${a.from_status}`) : '—'} → <b>{a.to_status ? t(`status.${a.to_status}`) : ''}</b>
+                </>
+            );
+        case 'tracking':
+            return line('activityShipped', { carrier: a.meta?.carrier ?? '—' });
+        case 'shipment_cancelled':
+            return line('activityShipmentCancelled', { carrier: a.meta?.carrier ?? '—' });
+        case 'payment_received':
+            return line('activityPaymentReceived', { gateway: a.meta?.gateway ?? '—' });
+        case 'payment_authorized':
+            return line('activityPaymentAuthorized', { gateway: a.meta?.gateway ?? '—' });
+        case 'payment_lapsed':
+            return line('activityPaymentLapsed');
+        case 'payment_link_sent':
+            return line('activityPaymentLinkSent');
+        default:
+            return a.type;
+    }
 }
 
 function Row({ label, value, icon: Icon }: { label: string; value: ReactNode; icon?: LucideIcon }) {
@@ -295,21 +349,18 @@ export default function OrderDetailView({
                                         className="flex justify-between gap-3 border-b border-neutral-100 pb-2 last:border-0 dark:border-neutral-800"
                                     >
                                         <span>
-                                            {a.type === 'status_change' ? (
-                                                <>
-                                                    {a.from_status ? t(`status.${a.from_status}`) : '—'} →{' '}
-                                                    <b>{a.to_status ? t(`status.${a.to_status}`) : ''}</b>
-                                                </>
-                                            ) : a.type === 'tracking' ? (
-                                                <b>{t('admin.orders.show.activityShipped', { carrier: a.meta?.carrier ?? '—' })}</b>
-                                            ) : a.type === 'shipment_cancelled' ? (
-                                                <b>{t('admin.orders.show.activityShipmentCancelled', { carrier: a.meta?.carrier ?? '—' })}</b>
-                                            ) : (
-                                                a.type
-                                            )}
+                                            {activityLabel(a, t)}
                                             {/* The detail that makes the row auditable: which parcel,
                                                 and what the carrier charged us for it. */}
                                             {a.meta?.tracking_number && <span className="text-neutral-500"> · {a.meta.tracking_number}</span>}
+                                            {/* What the CUSTOMER paid. Separate from `cost` above,
+                                                which is what the carrier charged the store. */}
+                                            {a.meta?.amount !== undefined && (
+                                                <span className="text-neutral-500">
+                                                    {' '}
+                                                    · {a.meta.amount.toFixed(2)} {a.meta.currency ?? order.currency}
+                                                </span>
+                                            )}
                                             {a.meta?.cost !== undefined && (
                                                 <span className="text-neutral-500">
                                                     {' '}

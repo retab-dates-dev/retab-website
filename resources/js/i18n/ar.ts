@@ -1382,6 +1382,10 @@ const ar = {
                 activityShipped: 'تم الشحن عبر {{carrier}}',
                 activityShipmentCancelled: 'تم سحب الشحنة ({{carrier}})',
                 activityCost: 'التكلفة',
+                activityPaymentReceived: 'تم استلام الدفعة عبر {{gateway}}',
+                activityPaymentAuthorized: 'تم حجز المبلغ عبر {{gateway}}، ويُحصَّل عند التأكيد',
+                activityPaymentLapsed: 'انتهت صلاحية حجز الدفعة',
+                activityPaymentLinkSent: 'تم إرسال رابط الدفع للعميل',
             },
             shipping: {
                 title: 'اختيار الناقل',

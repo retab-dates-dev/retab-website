@@ -107,4 +107,81 @@ class OrderActivity extends Model
             ], fn ($value) => $value !== null),
         ]);
     }
+
+    /**
+     * Record that money actually arrived (card captured at checkout).
+     *
+     * Its own type rather than a bare status change, for the same reason a
+     * shipment has one: "pending_payment → awaiting_confirmation" says the order
+     * moved on, but not that it moved on BECAUSE a payment settled, nor how much,
+     * nor through which gateway. The `payments` ledger stays the authoritative
+     * record; this is the line that makes the ORDER's own timeline readable.
+     *
+     * from/to are populated so the status timeline stays continuous.
+     */
+    public static function logPaymentReceived(
+        Order $order,
+        ?string $fromStatus,
+        string $gateway,
+        float|string|null $amount = null,
+        ?string $currency = null,
+        ?string $transactionId = null,
+        ?string $method = null,
+    ): self {
+        return static::logPaymentEvent($order, 'payment_received', $fromStatus, $gateway, $amount, $currency, $transactionId, $method);
+    }
+
+    /**
+     * Record that a BNPL authorization was placed.
+     *
+     * 🔑 Deliberately a DIFFERENT type from logPaymentReceived. Tamara holds the
+     * funds and nothing is captured until an admin confirms, so a hold that can
+     * still lapse is not money in the account. Collapsing the two would make the
+     * timeline claim a payment that has not happened — and `payment_lapsed`
+     * exists precisely because these holds do expire.
+     */
+    public static function logPaymentAuthorized(
+        Order $order,
+        ?string $fromStatus,
+        string $gateway,
+        float|string|null $amount = null,
+        ?string $currency = null,
+        ?string $transactionId = null,
+    ): self {
+        return static::logPaymentEvent($order, 'payment_authorized', $fromStatus, $gateway, $amount, $currency, $transactionId, null);
+    }
+
+    /**
+     * Shared shape for the two payment entries above.
+     *
+     * ⚠️ The amount key is `amount`, never `cost`: the order-detail timeline
+     * renders `meta.cost` as what a CARRIER charged the store, so reusing it
+     * here would label a customer payment as a shipping cost.
+     */
+    private static function logPaymentEvent(
+        Order $order,
+        string $type,
+        ?string $fromStatus,
+        string $gateway,
+        float|string|null $amount,
+        ?string $currency,
+        ?string $transactionId,
+        ?string $method,
+    ): self {
+        return static::create([
+            'order_id' => $order->id,
+            'type' => $type,
+            'from_status' => $fromStatus,
+            'to_status' => $order->status?->value,
+            // No user_id: a payment is settled by the customer and the gateway,
+            // never by a member of staff.
+            'meta' => array_filter([
+                'gateway' => $gateway,
+                'amount' => $amount === null ? null : (float) $amount,
+                'currency' => $currency,
+                'transaction_id' => $transactionId,
+                'method' => $method,
+            ], fn ($value) => $value !== null),
+        ]);
+    }
 }

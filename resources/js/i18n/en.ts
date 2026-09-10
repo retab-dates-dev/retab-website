@@ -1388,6 +1388,10 @@ const en = {
                 activityShipped: 'Shipped via {{carrier}}',
                 activityShipmentCancelled: 'Shipment recalled ({{carrier}})',
                 activityCost: 'cost',
+                activityPaymentReceived: 'Payment received via {{gateway}}',
+                activityPaymentAuthorized: 'Payment authorized via {{gateway}}, captured on confirmation',
+                activityPaymentLapsed: 'Payment authorization expired',
+                activityPaymentLinkSent: 'Payment link sent to the customer',
             },
             shipping: {
                 title: 'Choose a carrier',

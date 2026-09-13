@@ -67,7 +67,23 @@ class Product extends Model
             if ($product->is_active && $product->missingForPublish() !== []) {
                 $product->is_active = false;
             }
+
+            // A time-boxed product (a store-event offer) can never be live past
+            // its `available_until`. Same downgrade-not-refuse shape as the guard
+            // above, and on the model for the same reason: a change-log revert or
+            // a list toggle must not quietly re-publish a campaign that is over.
+            // The passage of time itself is covered by `catalog:hide-expired`,
+            // which runs every minute — nothing is saved when a clock ticks.
+            if ($product->is_active && $product->isPastAvailability()) {
+                $product->is_active = false;
+            }
         });
+    }
+
+    /** True once a time-boxed product's `available_until` has arrived. */
+    public function isPastAvailability(): bool
+    {
+        return $this->available_until !== null && ! $this->available_until->isFuture();
     }
 
     /**
@@ -222,6 +238,7 @@ class Product extends Model
         'is_active',
         'is_featured',
         'is_coming_soon',
+        'available_until',
     ];
 
     protected $casts = [
@@ -236,6 +253,7 @@ class Product extends Model
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
         'is_coming_soon' => 'boolean',
+        'available_until' => 'datetime',
     ];
 
     public function category(): BelongsTo

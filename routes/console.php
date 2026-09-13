@@ -37,3 +37,10 @@ Artisan::command('inspire', function () {
 Schedule::command('payments:alert-expiring')
     ->hourly()
     ->withoutOverlapping();
+
+// Time-boxed products (store-event offers) leave the storefront at their
+// `available_until`. Every minute because the promise to the client is "gone at
+// midnight", not "gone within the hour"; the query is one indexed-cheap SELECT.
+Schedule::command('catalog:hide-expired')
+    ->everyMinute()
+    ->withoutOverlapping();

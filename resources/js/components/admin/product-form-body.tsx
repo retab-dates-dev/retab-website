@@ -41,6 +41,8 @@ export interface Product {
     is_active: boolean;
     is_featured: boolean;
     is_coming_soon: boolean;
+    /** `YYYY-MM-DD HH:MM:SS`, or null for a product with no end date. */
+    available_until?: string | null;
     sale_applies_to_options?: boolean;
     images?: ProductImage[];
     options?: OptionRow[];
@@ -149,6 +151,9 @@ export default function ProductFormBody({
         is_active: product?.is_active ?? true,
         is_featured: product?.is_featured ?? false,
         is_coming_soon: product?.is_coming_soon ?? false,
+        // `datetime-local` will not accept `2026-10-01 00:00:00` (space + seconds)
+        // and renders EMPTY instead, which reads as the date having been lost.
+        available_until: product?.available_until ? product.available_until.replace(' ', 'T').slice(0, 16) : '',
         sale_applies_to_options: product?.sale_applies_to_options ?? false,
         options: (product?.options ?? []) as OptionRow[],
         images: [] as File[], // create only — the new product's images, sent with the form
@@ -445,6 +450,20 @@ export default function ProductFormBody({
                                 {t('admin.products.form.comingSoonLabel')}
                                 <span className="block text-xs text-neutral-400">{t('admin.products.form.comingSoonHint')}</span>
                             </span>
+                        </label>
+                        {/* Campaign products (store-event offers) take themselves off the
+                            store at this time; see Product's saving guard and the
+                            every-minute `catalog:hide-expired`. */}
+                        <label className="block text-sm" id="field-available_until">
+                            <span>{t('admin.products.form.availableUntil')}</span>
+                            <input
+                                type="datetime-local"
+                                value={data.available_until}
+                                onChange={(e) => setData('available_until', e.target.value)}
+                                className={INPUT}
+                            />
+                            <span className="mt-1 block text-xs text-neutral-400">{t('admin.products.form.availableUntilHint')}</span>
+                            {errors.available_until && <span className="mt-1 block text-xs text-red-600">{errors.available_until}</span>}
                         </label>
                     </section>
 

@@ -145,6 +145,11 @@ Route::middleware(['auth', 'staff', 'admin.locale'])->prefix('admin')->name('adm
         // the literal-before-wildcard order is the habit that stops the next
         // endpoint added under this prefix from being swallowed by it.
         Route::post('store-events/{store_event}/offers/reorder', [StoreEventController::class, 'reorderOffers'])->name('store-events.offers.reorder');
+        // Creates a brand-new product, so it also needs the product-create right —
+        // store_events.manage alone must not become a back door into the catalogue.
+        Route::post('store-events/{store_event}/offers/new', [StoreEventController::class, 'createOffer'])
+            ->middleware('permission:products.create')
+            ->name('store-events.offers.create');
         Route::post('store-events/{store_event}/offers', [StoreEventController::class, 'attachOffer'])->name('store-events.offers.attach');
         Route::patch('store-events/{store_event}/offers/{product}', [StoreEventController::class, 'updateOffer'])->name('store-events.offers.update');
         Route::delete('store-events/{store_event}/offers/{product}', [StoreEventController::class, 'detachOffer'])->name('store-events.offers.detach');
@@ -152,6 +157,12 @@ Route::middleware(['auth', 'staff', 'admin.locale'])->prefix('admin')->name('adm
         // would arrive empty (same reason product images have their own endpoint).
         Route::post('store-events/{store_event}/offers/{product}/banner', [StoreEventController::class, 'uploadOfferBanner'])->name('store-events.offers.banner');
         Route::delete('store-events/{store_event}/offers/{product}/banner', [StoreEventController::class, 'deleteOfferBanner'])->name('store-events.offers.banner.delete');
+
+        // Hero banners. `reorder` before the `{banner}` wildcard, same habit as offers.
+        Route::post('store-events/{store_event}/banners/reorder', [StoreEventController::class, 'reorderBanners'])->name('store-events.banners.reorder');
+        Route::post('store-events/{store_event}/banners', [StoreEventController::class, 'storeBanner'])->name('store-events.banners.store');
+        Route::patch('store-events/{store_event}/banners/{banner}', [StoreEventController::class, 'updateBanner'])->name('store-events.banners.update');
+        Route::delete('store-events/{store_event}/banners/{banner}', [StoreEventController::class, 'destroyBanner'])->name('store-events.banners.destroy');
     });
 
     // Customer directory (read-only).

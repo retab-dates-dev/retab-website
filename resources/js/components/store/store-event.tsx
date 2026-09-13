@@ -152,7 +152,7 @@ export default function StoreEventSection({ event }: { event: StoreEventPayload 
                                     href={`/products/${offer.slug}`}
                                     className="group relative flex shrink-0 basis-[calc((100%_-_1.25rem)_/_2)] snap-start flex-col overflow-hidden rounded-[18px] bg-white shadow-sm transition hover:shadow-lg"
                                 >
-                                    <div className="relative aspect-[16/9] overflow-hidden bg-[var(--ev)]">
+                                    <div className="relative aspect-[2/1] overflow-hidden bg-[var(--ev)]">
                                         {offer.image ? (
                                             <img
                                                 src={offer.image}

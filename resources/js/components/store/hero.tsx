@@ -2,6 +2,8 @@ import { Link, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useLocalized } from '@/lib/localize';
+
 /** One slide's copy, read from i18n (`hero.slides`). */
 interface SlideCopy {
     key: string;
@@ -43,40 +45,27 @@ interface SlideArt {
 }
 
 /**
- * A finished campaign banner. Headline, offer and CTA are all baked into the
- * artwork, so it carries no copy of its own — only descriptive alt text, read from
- * `hero.banners.<key>`.
+ * A campaign banner from a running store event (built by App\Support\HeroBanners,
+ * managed on /admin/store-events). Headline, offer and CTA are baked into the
+ * artwork, so it carries only alt text, in both locales.
+ *
+ * 🔑 While the server sends ANY banner, the hero shows banners and nothing else;
+ * when the event ends (or its banners are switched off) the four copy slides
+ * below come back untouched. See `slides` in StoreHero for why the two kinds
+ * never share the carousel.
  */
-interface Banner {
-    key: string;
-    /** The designer's 2:1 "website" cut. */
+interface HeroBanner {
+    id: number;
+    /** Desktop art, 2:1, served at the 1920px `hero` variant. */
     image: string;
-    /** The designer's 4:5 "social media" cut, used on phones. See BannerSlide. */
-    imageMobile: string;
+    /** Phone art, 4:5 — null when the admin uploaded none. */
+    image_mobile: string | null;
+    href: string;
+    alt_ar: string | null;
+    alt_en: string | null;
 }
 
-/**
- * Saudi National Day 2026 offers, in display order.
- *
- * 🔑 While this list has ANY entry, the hero shows these banners and nothing else;
- * empty it and the four copy slides below come back untouched. See `slides` in
- * StoreHero for why the two kinds never share the carousel.
- *
- * ⚠️ The artwork is Arabic only and is deliberately shown in both locales: there
- * is no English cut, and English visitors still get the offer from the alt text
- * and the event page it links to. The banners say the offers run "until the end
- * of month 9", so these rows come out (or move to the planned admin-managed hero)
- * once September is over.
- */
-const BANNERS: Banner[] = [
-    { key: 'package', image: '/images/hero/national-day/package.webp', imageMobile: '/images/hero/national-day/package-mobile.webp' },
-    { key: 'boxes', image: '/images/hero/national-day/boxes.webp', imageMobile: '/images/hero/national-day/boxes-mobile.webp' },
-    { key: 'khalas', image: '/images/hero/national-day/khalas.webp', imageMobile: '/images/hero/national-day/khalas-mobile.webp' },
-    { key: 'diet', image: '/images/hero/national-day/diet.webp', imageMobile: '/images/hero/national-day/diet-mobile.webp' },
-    { key: 'family', image: '/images/hero/national-day/family.webp', imageMobile: '/images/hero/national-day/family-mobile.webp' },
-];
-
-type Slide = { kind: 'banner'; key: string; banner: Banner } | { kind: 'copy'; key: string; copy: SlideCopy; art: SlideArt };
+type Slide = { kind: 'banner'; key: string; banner: HeroBanner } | { kind: 'copy'; key: string; copy: SlideCopy; art: SlideArt };
 
 /**
  * ⚠️ PHONE ART — only `harvest` has a portrait crop. The other three are the
@@ -220,22 +209,25 @@ function Arrow({ flip }: { flip?: boolean }) {
  * The aspect is reserved on the img itself, so a lazy banner whose file has not
  * arrived yet still holds its box instead of collapsing the hero to 0px.
  *
- * Phones get the designer's 4:5 social-media cut rather than the web banner: at
- * 390px wide the 2:1 banner renders 195px tall with its small print around 6px,
- * which nobody can read.
+ * Phones get the 4:5 phone art rather than the web banner: at 390px wide the 2:1
+ * banner renders 195px tall with its small print around 6px, which nobody can
+ * read. ⚠️ But only when EVERY banner in the set has phone art (`phonePoster`):
+ * phone art is optional per banner, and a set mixing 4:5 posters with 2:1 banners
+ * would change height on every other slide. Without a full set, phones show the
+ * desktop art too, at its own 2:1.
  */
-function BannerSlide({ banner, href, alt, priority }: { banner: Banner; href: string; alt: string; priority: boolean }) {
+function BannerSlide({ banner, alt, priority, phonePoster }: { banner: HeroBanner; alt: string; priority: boolean; phonePoster: boolean }) {
     return (
-        <Link href={href} className="block bg-[#01482b]">
+        <Link href={banner.href} className="block bg-[#01482b]">
             <picture>
-                <source media={MOBILE_ART} srcSet={banner.imageMobile} />
+                {phonePoster && banner.image_mobile && <source media={MOBILE_ART} srcSet={banner.image_mobile} />}
                 <img
                     // eager + high priority: the first banner is the homepage's LCP element.
                     fetchPriority={priority ? 'high' : 'auto'}
                     loading={priority ? 'eager' : 'lazy'}
                     src={banner.image}
                     alt={alt}
-                    className="block aspect-[2/1] w-full object-cover max-sm:aspect-[4/5]"
+                    className={`block aspect-[2/1] w-full object-cover ${phonePoster ? 'max-sm:aspect-[4/5]' : ''}`}
                 />
             </picture>
         </Link>
@@ -248,15 +240,18 @@ export default function StoreHero() {
     // alone, so it is correct during SSR where there is no document.
     const rtl = i18n.dir() === 'rtl';
 
-    // Banners point at the running campaign's own page when there is one (the same
-    // shared prop the navbar's event item reads), so "shop now" lands on the offers
-    // it advertised rather than on the whole catalogue. `/shop` once it has ended.
-    const { navEvents } = usePage().props as { navEvents?: { id: number }[] };
-    const bannerHref = Array.isArray(navEvents) && navEvents[0] ? `/shop?event=${navEvents[0].id}` : '/shop';
+    const localized = useLocalized();
+
+    // Homepage-only prop (ShopController::index). Each banner already carries its
+    // own link — to the offer it advertises, or to its event's page.
+    const { heroBanners } = usePage().props as { heroBanners?: HeroBanner[] };
+    const banners = Array.isArray(heroBanners) ? heroBanners : [];
+    // One phone shape for the whole set: posters only when every banner has one.
+    const phonePoster = banners.length > 0 && banners.every((b) => b.image_mobile);
 
     const raw = t('hero.slides', { returnObjects: true, defaultValue: [] }) as unknown;
     const copy = (Array.isArray(raw) ? raw : []) as SlideCopy[];
-    const bannerSlides = BANNERS.map((banner): Slide => ({ kind: 'banner', key: `banner-${banner.key}`, banner }));
+    const bannerSlides = banners.map((banner): Slide => ({ kind: 'banner', key: `banner-${banner.id}`, banner }));
     const copySlides: Slide[] = [
         // Drop any copy entry with no matching art rather than rendering a slide with
         // a broken image, and keep i18n order as carousel order.
@@ -358,7 +353,7 @@ export default function StoreHero() {
             onBlurCapture={() => setPaused(false)}
         >
             {current.kind === 'banner' ? (
-                <BannerSlide banner={current.banner} href={bannerHref} alt={t(`hero.banners.${current.banner.key}`)} priority={active === 0} />
+                <BannerSlide banner={current.banner} phonePoster={phonePoster} alt={localized(current.banner, 'alt')} priority={active === 0} />
             ) : (
                 <CopySlide slide={current.copy} art={current.art} priority={active === 0} />
             )}

@@ -21,6 +21,11 @@ return [
         'thumb' => ['width' => 150, 'quality' => 80],   // search suggestions, cart lines
         'card' => ['width' => 500, 'quality' => 80],    // catalogue / homepage grid cards
         'detail' => ['width' => 1400, 'quality' => 82], // product page main image
+        // Homepage hero banners, which run full-bleed on 1920px screens and carry
+        // baked-in text — `detail` would be upscaled 1.37× there and the type goes
+        // soft. Generated for every upload (products too) because variants are
+        // global; the cost is one extra WebP per image, and only banners request it.
+        'hero' => ['width' => 1920, 'quality' => 84],
     ],
 
     /*

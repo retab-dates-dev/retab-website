@@ -76,8 +76,13 @@ class StoreEventCards
             'badge_ar' => $pivot?->badge_ar,
             'badge_en' => $pivot?->badge_en,
             // The offer's own artwork when there is any, else the product's primary
-            // photo cropped to 16:9 by the card. `detail` (1400px) rather than
+            // photo cropped to 2:1 by the card. `detail` (1400px) rather than
             // `card` (500px): these render ~780px wide at two per row.
+            //
+            // 2:1, not the original 16:9 (changed 2026-09-13): 2:1 is the shape
+            // campaign artwork is delivered in — the same as the hero banners — and
+            // a 16:9 crop of a 2:1 banner cuts ~6% off each side, where designers
+            // put text.
             'image' => Media::url($pivot?->banner_image ?: $product->primaryImage()?->path, 'detail'),
         ];
     }

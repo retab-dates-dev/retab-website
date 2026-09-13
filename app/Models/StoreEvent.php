@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
@@ -71,6 +72,14 @@ class StoreEvent extends Model
             ->orderBy('event_product.id');
     }
 
+    /** The event's homepage hero banners, in the admin's arranged order. */
+    public function heroBanners(): HasMany
+    {
+        return $this->hasMany(EventHeroBanner::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
     /**
      * Events live on the storefront right now: switched on AND inside their window.
      *
@@ -111,6 +120,20 @@ class StoreEvent extends Model
         }
 
         return 'active';
+    }
+
+    /**
+     * Where campaign-only products live: the Special Offers category, seeded by
+     * the store-events migration. firstOrCreate as a belt-and-braces for a
+     * database where that row was deleted by hand — an offer created into a
+     * missing category would fail its insert instead.
+     */
+    public static function offersCategory(): Category
+    {
+        return Category::firstOrCreate(
+            ['slug' => 'special-offers'],
+            ['name_ar' => 'العروض الخاصة', 'name_en' => 'Special Offers', 'sort_order' => 90, 'is_active' => true],
+        );
     }
 
     /** The event's accent, falling back to brand teal when it has none. */

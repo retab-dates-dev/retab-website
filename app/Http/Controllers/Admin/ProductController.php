@@ -275,6 +275,7 @@ class ProductController extends Controller
             'is_active' => $product->is_active,
             'is_featured' => $product->is_featured,
             'is_coming_soon' => $product->is_coming_soon,
+            'available_until' => $product->available_until?->toDateTimeString(),
             'sale_applies_to_options' => (bool) $product->sale_applies_to_options,
             'images' => $product->images->sortBy('sort_order')->values()->map(fn ($img) => [
                 'id' => $img->id,
@@ -457,6 +458,9 @@ class ProductController extends Controller
             'is_active' => ['boolean'],
             'is_featured' => ['boolean'],
             'is_coming_soon' => ['boolean'],
+            // Optional end of a time-boxed product's life on the store. Past dates
+            // are allowed: saving one simply hides the product (see Product's guard).
+            'available_until' => ['nullable', 'date'],
         ]);
 
         if (empty($data['slug'])) {

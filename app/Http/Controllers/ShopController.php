@@ -13,6 +13,7 @@ use App\Models\StoreEvent;
 use App\Models\Wishlist;
 use App\Services\ReviewRewardService;
 use App\Services\ReviewService;
+use App\Support\HeroBanners;
 use App\Support\Media;
 use App\Support\ProductCards;
 use App\Support\SearchText;
@@ -39,6 +40,9 @@ class ShopController
             // order, which needs no "which one wins" rule and handles the ordinary
             // single-event case for free.
             'storeEvents' => $this->storeEvents(),
+            // A running event's own hero banners. Non-empty ⇒ the hero shows only
+            // these; empty ⇒ it falls back to its copy slides.
+            'heroBanners' => HeroBanners::live(),
             // Active discounted products for the homepage "offers" strip (empty →
             // the section renders nothing). Featured first, then newest.
             //

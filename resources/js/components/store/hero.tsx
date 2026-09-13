@@ -56,7 +56,11 @@ interface Banner {
 }
 
 /**
- * Saudi National Day 2026 offers. Shown BEFORE the copy slides, in this order.
+ * Saudi National Day 2026 offers, in display order.
+ *
+ * 🔑 While this list has ANY entry, the hero shows these banners and nothing else;
+ * empty it and the four copy slides below come back untouched. See `slides` in
+ * StoreHero for why the two kinds never share the carousel.
  *
  * ⚠️ The artwork is Arabic only and is deliberately shown in both locales: there
  * is no English cut, and English visitors still get the offer from the alt text
@@ -209,17 +213,12 @@ function Arrow({ flip }: { flip?: boolean }) {
  * A finished campaign banner: no overlay copy, no scrim, and the whole slide is
  * the link (the "shop now" pill is part of the artwork).
  *
- * 🔑 Shown WHOLE (`object-contain`), never cropped. The web cut is 2:1 while the
- * hero box is the copy slides' 1440/800 (1.8:1), so a cover crop takes 5% off each
- * side — and on all five banners the headline, the offer text and the small print
- * run to within ~3% of the right edge, so that crop cut through words on every one.
- * Contained, the art fills the full width and leaves ~5% of the height over, which
- * is filled by a blurred copy of the same image: the bars read as the banner's own
- * green and floor rather than as letterboxing.
- *
- * 🔑 The box keeps the SAME aspect as the copy slides at every width (1440/800 on
- * desktop, 402/804 on phones). Every slide must resolve to one height, or the page
- * below jumps each time the carousel advances.
+ * 🔑 Rendered in the art's OWN shape (2:1 on desktop, 4:5 on phones), so nothing
+ * is cropped and nothing is filled. That is only safe because banners never share
+ * the carousel with the 1440/800 copy slides (see `slides` in StoreHero): mixed,
+ * the hero would change height as it rotates and drag the page below with it.
+ * The aspect is reserved on the img itself, so a lazy banner whose file has not
+ * arrived yet still holds its box instead of collapsing the hero to 0px.
  *
  * Phones get the designer's 4:5 social-media cut rather than the web banner: at
  * 390px wide the 2:1 banner renders 195px tall with its small print around 6px,
@@ -227,13 +226,7 @@ function Arrow({ flip }: { flip?: boolean }) {
  */
 function BannerSlide({ banner, href, alt, priority }: { banner: Banner; href: string; alt: string; priority: boolean }) {
     return (
-        <Link href={href} className="relative block aspect-[1440/800] w-full overflow-hidden bg-[#01482b] max-sm:aspect-[402/804]">
-            {/* The fill. `scale-110` pushes the blur's soft, semi-transparent edge
-                outside the box so no pale rim shows at the section's border. */}
-            <picture>
-                <source media={MOBILE_ART} srcSet={banner.imageMobile} />
-                <img src={banner.image} alt="" aria-hidden className="absolute inset-0 size-full scale-110 object-cover object-bottom blur-2xl" />
-            </picture>
+        <Link href={href} className="block bg-[#01482b]">
             <picture>
                 <source media={MOBILE_ART} srcSet={banner.imageMobile} />
                 <img
@@ -242,12 +235,7 @@ function BannerSlide({ banner, href, alt, priority }: { banner: Banner; href: st
                     loading={priority ? 'eager' : 'lazy'}
                     src={banner.image}
                     alt={alt}
-                    // `object-top`: the art sits flush under the navbar and ALL of the
-                    // spare height goes below it, where the blurred floor continues
-                    // the art's own floor. Centred, the spare split into a band above
-                    // AND below, and the art's top edge read as a hard line through
-                    // a dark green bar (seen on desktop and phone alike).
-                    className="relative block size-full object-contain object-top"
+                    className="block aspect-[2/1] w-full object-cover max-sm:aspect-[4/5]"
                 />
             </picture>
         </Link>
@@ -268,13 +256,22 @@ export default function StoreHero() {
 
     const raw = t('hero.slides', { returnObjects: true, defaultValue: [] }) as unknown;
     const copy = (Array.isArray(raw) ? raw : []) as SlideCopy[];
-    const slides: Slide[] = [
-        // Prefixed so a banner key can never collide with a copy slide's key in the dots.
-        ...BANNERS.map((banner): Slide => ({ kind: 'banner', key: `banner-${banner.key}`, banner })),
+    const bannerSlides = BANNERS.map((banner): Slide => ({ kind: 'banner', key: `banner-${banner.key}`, banner }));
+    const copySlides: Slide[] = [
         // Drop any copy entry with no matching art rather than rendering a slide with
         // a broken image, and keep i18n order as carousel order.
         ...copy.filter((c) => ART[c.key]).map((c): Slide => ({ kind: 'copy', key: c.key, copy: c, art: ART[c.key] })),
     ];
+    /**
+     * 🔑 Banners OR copy slides, never both (client decision, 2026-09-13). They are
+     * different shapes — the banners 2:1 / 4:5, the copy slides 1440/800 / 402/804 —
+     * and every slide in one carousel must share one height, or the page below
+     * jumps as it rotates (~80px on a laptop, ~300px on a phone). The ways to mix
+     * them were all worse: cropping a banner into 1.8:1 cut through its text,
+     * letterboxing it left a visible filled strip, and making everything 2:1 would
+     * crop the photo slides. Running banners alone lets each keep its own shape.
+     */
+    const slides = bannerSlides.length > 0 ? bannerSlides : copySlides;
 
     const [index, setIndex] = useState(0);
     const [paused, setPaused] = useState(false);
@@ -394,15 +391,31 @@ export default function StoreHero() {
                         <Arrow />
                     </button>
 
-                    {/* Dots */}
-                    <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2">
+                    {/* Dots. On phones a banner's small print (the offer's end date)
+                        runs along its bottom edge, and dots laid over the art sat right
+                        on it. So for banners on phones the dots drop BELOW the art into
+                        their own row, teal because they now sit on the page background
+                        rather than on the image. Desktop keeps them on the art, where
+                        the banner's floor is empty at centre-bottom. */}
+                    <div
+                        className={`flex items-center gap-2 ${
+                            current.kind === 'banner'
+                                ? // `bottom-[4%]`, not a fixed 20px: lifted off the section's
+                                  // edge (client-asked), and a percentage keeps the same place
+                                  // on the art at every width. Clear of the products on all
+                                  // five; the tightest is the diet tray, whose bottom sits at
+                                  // ~93% of the banner's height.
+                                  'absolute bottom-[4%] left-1/2 -translate-x-1/2 max-sm:static max-sm:translate-x-0 max-sm:justify-center max-sm:py-3'
+                                : 'absolute bottom-5 left-1/2 -translate-x-1/2'
+                        }`}
+                    >
                         {slides.map((s, i) => (
                             <button
                                 key={s.key}
                                 type="button"
                                 onClick={() => goTo(() => i)}
                                 aria-label={`${t('hero.goToSlide')} ${i + 1}`}
-                                className={`rounded-full bg-white transition-all ${
+                                className={`rounded-full bg-white transition-all ${current.kind === 'banner' ? 'max-sm:bg-brand-teal' : ''} ${
                                     i === active ? 'size-3 opacity-90' : 'size-2 opacity-50 hover:opacity-75'
                                 }`}
                             />

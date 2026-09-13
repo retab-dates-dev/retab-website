@@ -172,6 +172,15 @@ const en = {
                 cta: 'Shop now',
             },
         ],
+        // Alt text for the campaign banners (hero.tsx → BANNERS). The artwork is
+        // Arabic only, so for an English visitor this is the only English version.
+        banners: {
+            package: 'National Day package offer: 2.5 kg first-grade Khalas, Al Shuyoukh coffee, tahini, a maamoul box and rusks',
+            boxes: 'National Day boxes offer: a cream-stuffed dates box plus a box of your choice, almond-stuffed Sagai or Sukkari',
+            khalas: 'National Day Khalas offer: 6 kg of first-grade, saffron or fennel Khalas',
+            diet: 'National Day diet offer: organic wholegrain flour, date granola, a maamoul box, Al Rashaqa rusks, date molasses and Al Shuyoukh coffee',
+            family: 'National Day family offer: 3 kg first-grade Sukkari, 6 kg first-grade Khalas and tahini',
+        },
         prevSlide: 'Previous slide',
         nextSlide: 'Next slide',
         // The dots announce a destination, not a direction — they used to reuse

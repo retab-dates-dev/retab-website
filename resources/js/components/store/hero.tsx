@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -41,6 +41,38 @@ interface SlideArt {
     /** object-position for the phone crop when there is no portrait art. */
     phoneFocus?: string;
 }
+
+/**
+ * A finished campaign banner. Headline, offer and CTA are all baked into the
+ * artwork, so it carries no copy of its own — only descriptive alt text, read from
+ * `hero.banners.<key>`.
+ */
+interface Banner {
+    key: string;
+    /** The designer's 2:1 "website" cut. */
+    image: string;
+    /** The designer's 4:5 "social media" cut, used on phones. See BannerSlide. */
+    imageMobile: string;
+}
+
+/**
+ * Saudi National Day 2026 offers. Shown BEFORE the copy slides, in this order.
+ *
+ * ⚠️ The artwork is Arabic only and is deliberately shown in both locales: there
+ * is no English cut, and English visitors still get the offer from the alt text
+ * and the event page it links to. The banners say the offers run "until the end
+ * of month 9", so these rows come out (or move to the planned admin-managed hero)
+ * once September is over.
+ */
+const BANNERS: Banner[] = [
+    { key: 'package', image: '/images/hero/national-day/package.webp', imageMobile: '/images/hero/national-day/package-mobile.webp' },
+    { key: 'boxes', image: '/images/hero/national-day/boxes.webp', imageMobile: '/images/hero/national-day/boxes-mobile.webp' },
+    { key: 'khalas', image: '/images/hero/national-day/khalas.webp', imageMobile: '/images/hero/national-day/khalas-mobile.webp' },
+    { key: 'diet', image: '/images/hero/national-day/diet.webp', imageMobile: '/images/hero/national-day/diet-mobile.webp' },
+    { key: 'family', image: '/images/hero/national-day/family.webp', imageMobile: '/images/hero/national-day/family-mobile.webp' },
+];
+
+type Slide = { kind: 'banner'; key: string; banner: Banner } | { kind: 'copy'; key: string; copy: SlideCopy; art: SlideArt };
 
 /**
  * ⚠️ PHONE ART — only `harvest` has a portrait crop. The other three are the
@@ -173,17 +205,76 @@ function Arrow({ flip }: { flip?: boolean }) {
     );
 }
 
+/**
+ * A finished campaign banner: no overlay copy, no scrim, and the whole slide is
+ * the link (the "shop now" pill is part of the artwork).
+ *
+ * 🔑 Shown WHOLE (`object-contain`), never cropped. The web cut is 2:1 while the
+ * hero box is the copy slides' 1440/800 (1.8:1), so a cover crop takes 5% off each
+ * side — and on all five banners the headline, the offer text and the small print
+ * run to within ~3% of the right edge, so that crop cut through words on every one.
+ * Contained, the art fills the full width and leaves ~5% of the height over, which
+ * is filled by a blurred copy of the same image: the bars read as the banner's own
+ * green and floor rather than as letterboxing.
+ *
+ * 🔑 The box keeps the SAME aspect as the copy slides at every width (1440/800 on
+ * desktop, 402/804 on phones). Every slide must resolve to one height, or the page
+ * below jumps each time the carousel advances.
+ *
+ * Phones get the designer's 4:5 social-media cut rather than the web banner: at
+ * 390px wide the 2:1 banner renders 195px tall with its small print around 6px,
+ * which nobody can read.
+ */
+function BannerSlide({ banner, href, alt, priority }: { banner: Banner; href: string; alt: string; priority: boolean }) {
+    return (
+        <Link href={href} className="relative block aspect-[1440/800] w-full overflow-hidden bg-[#01482b] max-sm:aspect-[402/804]">
+            {/* The fill. `scale-110` pushes the blur's soft, semi-transparent edge
+                outside the box so no pale rim shows at the section's border. */}
+            <picture>
+                <source media={MOBILE_ART} srcSet={banner.imageMobile} />
+                <img src={banner.image} alt="" aria-hidden className="absolute inset-0 size-full scale-110 object-cover object-bottom blur-2xl" />
+            </picture>
+            <picture>
+                <source media={MOBILE_ART} srcSet={banner.imageMobile} />
+                <img
+                    // eager + high priority: the first banner is the homepage's LCP element.
+                    fetchPriority={priority ? 'high' : 'auto'}
+                    loading={priority ? 'eager' : 'lazy'}
+                    src={banner.image}
+                    alt={alt}
+                    // `object-top`: the art sits flush under the navbar and ALL of the
+                    // spare height goes below it, where the blurred floor continues
+                    // the art's own floor. Centred, the spare split into a band above
+                    // AND below, and the art's top edge read as a hard line through
+                    // a dark green bar (seen on desktop and phone alike).
+                    className="relative block size-full object-contain object-top"
+                />
+            </picture>
+        </Link>
+    );
+}
+
 export default function StoreHero() {
     const { t, i18n } = useTranslation();
     // `i18n.dir()` rather than reading document.dir: it resolves from the language
     // alone, so it is correct during SSR where there is no document.
     const rtl = i18n.dir() === 'rtl';
 
+    // Banners point at the running campaign's own page when there is one (the same
+    // shared prop the navbar's event item reads), so "shop now" lands on the offers
+    // it advertised rather than on the whole catalogue. `/shop` once it has ended.
+    const { navEvents } = usePage().props as { navEvents?: { id: number }[] };
+    const bannerHref = Array.isArray(navEvents) && navEvents[0] ? `/shop?event=${navEvents[0].id}` : '/shop';
+
     const raw = t('hero.slides', { returnObjects: true, defaultValue: [] }) as unknown;
     const copy = (Array.isArray(raw) ? raw : []) as SlideCopy[];
-    // Drop any copy entry with no matching art rather than rendering a slide with
-    // a broken image, and keep i18n order as carousel order.
-    const slides = copy.filter((c) => ART[c.key]);
+    const slides: Slide[] = [
+        // Prefixed so a banner key can never collide with a copy slide's key in the dots.
+        ...BANNERS.map((banner): Slide => ({ kind: 'banner', key: `banner-${banner.key}`, banner })),
+        // Drop any copy entry with no matching art rather than rendering a slide with
+        // a broken image, and keep i18n order as carousel order.
+        ...copy.filter((c) => ART[c.key]).map((c): Slide => ({ kind: 'copy', key: c.key, copy: c, art: ART[c.key] })),
+    ];
 
     const [index, setIndex] = useState(0);
     const [paused, setPaused] = useState(false);
@@ -235,8 +326,7 @@ export default function StoreHero() {
     if (slides.length === 0) return null;
 
     const active = Math.min(index, slides.length - 1);
-    const slide = slides[active];
-    const art = ART[slide.key];
+    const current = slides[active];
     const many = slides.length > 1;
     const prev = () => goTo((i) => (i - 1 + slides.length) % slides.length);
     const next = () => goTo((i) => (i + 1) % slides.length);
@@ -270,6 +360,64 @@ export default function StoreHero() {
             }}
             onBlurCapture={() => setPaused(false)}
         >
+            {current.kind === 'banner' ? (
+                <BannerSlide banner={current.banner} href={bannerHref} alt={t(`hero.banners.${current.banner.key}`)} priority={active === 0} />
+            ) : (
+                <CopySlide slide={current.copy} art={current.art} priority={active === 0} />
+            )}
+
+            {/* Carousel arrows (only when there's more than one slide).
+                🔑 The BUTTONS are physical (a left-pointing arrow is always on the
+                left) but which slide each one reaches is DIRECTIONAL: "next" lies
+                leftward in Arabic and rightward in English. So the handler and the
+                label are chosen from the reading direction, not hardcoded.
+                This was latent until now — with a single slide `many` was false and
+                the arrows never rendered, so nothing exercised it. Same class of bug
+                as the product-carousel arrows on 2026-08-15, where `scrollLeft`'s
+                sign under RTL made the enabled arrow the one that did nothing. */}
+            {many && (
+                <>
+                    <button
+                        type="button"
+                        onClick={rtl ? next : prev}
+                        aria-label={rtl ? t('hero.nextSlide') : t('hero.prevSlide')}
+                        className="absolute top-1/2 left-4 -translate-y-1/2 opacity-70 transition-opacity hover:opacity-100"
+                    >
+                        <Arrow flip />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={rtl ? prev : next}
+                        aria-label={rtl ? t('hero.prevSlide') : t('hero.nextSlide')}
+                        className="absolute top-1/2 right-4 -translate-y-1/2 opacity-70 transition-opacity hover:opacity-100"
+                    >
+                        <Arrow />
+                    </button>
+
+                    {/* Dots */}
+                    <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2">
+                        {slides.map((s, i) => (
+                            <button
+                                key={s.key}
+                                type="button"
+                                onClick={() => goTo(() => i)}
+                                aria-label={`${t('hero.goToSlide')} ${i + 1}`}
+                                className={`rounded-full bg-white transition-all ${
+                                    i === active ? 'size-3 opacity-90' : 'size-2 opacity-50 hover:opacity-75'
+                                }`}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
+        </section>
+    );
+}
+
+/** A photograph with live, translated headline copy laid over it. */
+function CopySlide({ slide, art, priority }: { slide: SlideCopy; art: SlideArt; priority: boolean }) {
+    return (
+        <>
             {/* <picture>, not two <img> toggled with `hidden`: the browser picks ONE
                 source and downloads only that, so a phone never pulls the desktop
                 crop it isn't going to show. */}
@@ -293,11 +441,17 @@ export default function StoreHero() {
                 {art.imageMobile && <source media={MOBILE_ART} srcSet={art.imageMobile} />}
                 <img
                     // eager + high priority: this is the LCP element on the homepage.
-                    fetchPriority={active === 0 ? 'high' : 'auto'}
-                    loading={active === 0 ? 'eager' : 'lazy'}
+                    fetchPriority={priority ? 'high' : 'auto'}
+                    loading={priority ? 'eager' : 'lazy'}
                     src={art.image}
                     alt=""
-                    className={`block h-auto w-full max-sm:aspect-[402/804] max-sm:object-cover ${
+                    // 🔴 `aspect-[1440/800]`, not bare `h-auto`: every slide after the
+                    // first is lazy-loaded, and until its image arrives an `h-auto`
+                    // img is 0px tall, so the whole hero collapsed and the page below
+                    // jumped up (measured: 0px on a dot press to an unloaded slide).
+                    // All four plates are 1440x800, so reserving that box changes
+                    // nothing once they load.
+                    className={`block aspect-[1440/800] h-auto w-full object-cover max-sm:aspect-[402/804] ${
                         art.imageMobile ? 'max-sm:object-bottom' : (art.phoneFocus ?? 'max-sm:object-center')
                     }`}
                 />
@@ -414,51 +568,6 @@ export default function StoreHero() {
                     </div>
                 </div>
             </div>
-
-            {/* Carousel arrows (only when there's more than one slide).
-                🔑 The BUTTONS are physical (a left-pointing arrow is always on the
-                left) but which slide each one reaches is DIRECTIONAL: "next" lies
-                leftward in Arabic and rightward in English. So the handler and the
-                label are chosen from the reading direction, not hardcoded.
-                This was latent until now — with a single slide `many` was false and
-                the arrows never rendered, so nothing exercised it. Same class of bug
-                as the product-carousel arrows on 2026-08-15, where `scrollLeft`'s
-                sign under RTL made the enabled arrow the one that did nothing. */}
-            {many && (
-                <>
-                    <button
-                        type="button"
-                        onClick={rtl ? next : prev}
-                        aria-label={rtl ? t('hero.nextSlide') : t('hero.prevSlide')}
-                        className="absolute top-1/2 left-4 -translate-y-1/2 opacity-70 transition-opacity hover:opacity-100"
-                    >
-                        <Arrow flip />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={rtl ? prev : next}
-                        aria-label={rtl ? t('hero.prevSlide') : t('hero.nextSlide')}
-                        className="absolute top-1/2 right-4 -translate-y-1/2 opacity-70 transition-opacity hover:opacity-100"
-                    >
-                        <Arrow />
-                    </button>
-
-                    {/* Dots */}
-                    <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2">
-                        {slides.map((s, i) => (
-                            <button
-                                key={s.key}
-                                type="button"
-                                onClick={() => goTo(() => i)}
-                                aria-label={`${t('hero.goToSlide')} ${i + 1}`}
-                                className={`rounded-full bg-white transition-all ${
-                                    i === active ? 'size-3 opacity-90' : 'size-2 opacity-50 hover:opacity-75'
-                                }`}
-                            />
-                        ))}
-                    </div>
-                </>
-            )}
-        </section>
+        </>
     );
 }

@@ -171,6 +171,15 @@ const ar = {
                 cta: 'تسوّق الآن',
             },
         ],
+        // Alt text for the campaign banners (hero.tsx → BANNERS). The artwork carries
+        // its own headline, so this is what a screen reader hears in its place.
+        banners: {
+            package: 'عرض البكج لليوم الوطني: ٢٫٥ كيلو خلاص درجة أولى، قهوة الشيوخ، طحينية، بوكس معمول وشابورة',
+            boxes: 'عرض البوكسات لليوم الوطني: بوكس محشي بالكريمة وبوكس من اختيارك، صقعي محشي لوز أو سكري محشي لوز',
+            khalas: 'عرض الخلاص لليوم الوطني: ٦ كيلو خلاص درجة أولى أو خلاص بالزعفران أو خلاص الشمر',
+            diet: 'عرض الدايت لليوم الوطني: طحين بر بلدي عضوي، قرانولا التمر، بوكس معمول، شابورة أصل الرشاقة، دبس وقهوة الشيوخ',
+            family: 'عرض العائلة لليوم الوطني: ٣ كيلو سكري درجة أولى، ٦ كيلو خلاص درجة أولى وطحينية',
+        },
         prevSlide: 'الشريحة السابقة',
         nextSlide: 'الشريحة التالية',
         // The dots announce a destination, not a direction — they used to reuse
